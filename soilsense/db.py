@@ -39,12 +39,19 @@ def connect(url=None):
         raise DatabaseError("No database address configured.")
     with _lock:
         if _conn is None or _conn.closed:
-            try:
-                _conn = psycopg2.connect(
-                    url, connect_timeout=15, application_name="soilsense-desktop",
-                    keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
-            except psycopg2.OperationalError as e:
-                raise DatabaseError(f"Could not reach the database: {str(e).strip().splitlines()[0]}") from e
+            # Neon may need a few seconds to wake a sleeping database, so try twice with a longer wait
+            for attempt, wait in ((1, 15), (2, 30)):
+                try:
+                    _conn = psycopg2.connect(
+                        url, connect_timeout=wait, application_name="soilsense-desktop",
+                        keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+                    break
+                except psycopg2.OperationalError as e:
+                    if attempt == 2:
+                        msg = str(e).strip().splitlines()[0]
+                        hint = (" \u2014 if this keeps happening, your network may be blocking port 5432 "
+                                "(common on college Wi-Fi); try a phone hotspot.") if "timeout" in msg else ""
+                        raise DatabaseError(f"Could not reach the database: {msg}{hint}") from e
     return _conn
 
 

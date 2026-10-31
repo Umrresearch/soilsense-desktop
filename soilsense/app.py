@@ -2,7 +2,6 @@
 import tkinter as tk
 
 from . import config, db, theme as T
-from .ds import Stack
 from .screens.analytics import AnalyticsScreen
 from .screens.dashboard import DashboardScreen
 from .screens.login import LoginScreen
@@ -29,7 +28,7 @@ class App:
         T.setup(root)
         self.worker = Worker(root)
         self.farmer = None
-        self.history = Stack()                  # Back button: last screens visited (LIFO)
+        self.history = []                       # Back button: list used as a stack (last screen visited on top)
         self.current = None
         self.screens = {}
         self._busy = 0
@@ -62,7 +61,7 @@ class App:
             if job:
                 self.root.after_cancel(job)
         self._refresh_job = self._toast_job = None
-        self.farmer, self.history, self.screens, self.current = None, Stack(), {}, None
+        self.farmer, self.history, self.screens, self.current = None, [], {}, None
         if go_setup:
             db.close()
             self._clear()
@@ -128,7 +127,9 @@ class App:
 
     def navigate(self, key, remember=True, **kw):
         if self.current and remember and key != self.current:
-            self.history.push(self.current)
+            if not self.history or self.history[-1] != self.current:
+                self.history.append(self.current)
+                del self.history[:-50]                  # keep at most 50 screens of history
         for k, item in self.nav_items.items():
             on = k == key
             item.config(bg=T.EMERALD if on else "#050605", fg=T.TEXT if on else T.TEXT_2)
@@ -140,11 +141,11 @@ class App:
         screen.pack(fill="both", expand=True)
         self.title.config(text=screen.title.upper())
         self.current = key
-        self.back_btn.set_enabled(not self.history.is_empty())
+        self.back_btn.set_enabled(bool(self.history))
         screen.refresh(**kw)
 
     def back(self):
-        if not self.history.is_empty():
+        if self.history:
             self.navigate(self.history.pop(), remember=False)
 
     def refresh_current(self):

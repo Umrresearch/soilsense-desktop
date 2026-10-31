@@ -1,11 +1,11 @@
-"""Live sensors — one chart per sensor type, threshold lines, and a BST-powered hover read-out."""
+"""Live sensors — one chart per sensor type, threshold lines, and a hover read-out (binary search with bisect)."""
 import tkinter as tk
+from bisect import bisect_right
 from tkinter import ttk
 
 import matplotlib.dates as mdates
 
 from .. import db, theme as T
-from ..ds import BST
 from ..widgets import Button, Chart, ScrollPage, card, fmt_num, time_ago
 from .base import Screen
 
@@ -19,7 +19,7 @@ class SensorsScreen(Screen):
     def __init__(self, parent, app):
         super().__init__(parent, app)
         self.hours, self.field_id, self.fields = 168, None, []
-        self.trees, self.heights = {}, {}                 # sensor type → BST of (time → value)
+        self.times, self.points = {}, {}                  # sensor type → sorted times / (time, value) readings
 
         bar = tk.Frame(self, bg=T.BG)
         bar.pack(fill="x", padx=20, pady=(16, 6))
@@ -105,9 +105,9 @@ class SensorsScreen(Screen):
                  "HUMIDITY": [(t["humidity_high"], "disease risk")]}
         for kind, ch in self.charts.items():
             pts = [(r["t"], float(r["v"])) for r in series[kind] if r["v"] is not None]
-            # BST keyed by time; data arrives sorted, so build it balanced (height ≈ log2 n)
-            self.trees[kind] = BST.from_sorted([(mdates.date2num(x), (x, v)) for x, v in pts])
-            self.heights[kind] = self.trees[kind].height()
+            # readings arrive sorted by time, so the hover read-out can binary-search them
+            self.times[kind] = [mdates.date2num(x) for x, _ in pts]
+            self.points[kind] = pts
             ch.clear()
             if not pts:
                 ch.empty("No readings in this period")
@@ -128,12 +128,11 @@ class SensorsScreen(Screen):
                                             f"min {min(ys):.1f} · max {max(ys):.1f} · {len(pts)} points")
 
     def hover(self, kind, event):
-        """Mouse over a chart → BST floor search for the reading at or just before that time."""
-        tree = self.trees.get(kind)
-        if not tree or event.xdata is None or tree.size == 0:
+        """Mouse over a chart → binary search (bisect) for the reading at or just before that time."""
+        times = self.times.get(kind)
+        if not times or event.xdata is None:
             return
-        hit = tree.floor(event.xdata) or tree.min()
-        x, v = hit[1]
+        i = max(0, bisect_right(times, event.xdata) - 1)
+        x, v = self.points[kind][i]
         unit = META[kind][1]
-        self.readouts[kind].config(text=f"{x:%a %d %b %H:%M}  →  {v:.1f}{unit}   (found by BST floor search, "
-                                        f"tree height {self.heights[kind]} for {tree.size} readings)")
+        self.readouts[kind].config(text=f"{x:%a %d %b %H:%M}  →  {v:.1f}{unit}   ({len(times)} readings)")

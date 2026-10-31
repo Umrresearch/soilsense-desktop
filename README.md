@@ -26,7 +26,7 @@ here (mark advice as done, change thresholds) shows on the website too, and the 
 |---|---|
 | Login | e-mail / mobile / Farmer ID + password, checked with bcrypt against the stored hash |
 | Dashboard | moisture, water, pending advice, sensors online; water-by-field and moisture-trend charts; fields table; alerts; **Re-check advice** |
-| Live sensors | choose a field and period; moisture / temperature / humidity charts with threshold lines; hover read-out (BST search) |
+| Live sensors | choose a field and period; moisture / temperature / humidity charts with threshold lines; hover read-out (binary search) |
 | Analytics | water per day, fertilizer by product, yield vs district, next-season forecast, field comparison |
 | Recommendations | filter by status and type; **Mark as done** (writes the irrigation/fertilizer log in the same transaction) or **Dismiss** |
 | Settings | edit alert thresholds (database CHECK rules reject impossible values), then every field is re-checked |
@@ -43,21 +43,18 @@ soilsense/
 ├── auth.py                 bcrypt login
 ├── worker.py               background thread so the window never freezes
 ├── config.py               reads the Neon address from config.ini / env var
-└── ds/                     hand-written data structures
-tests/test_ds.py            unit tests:  python -m unittest discover -s tests
+├── theme.py                colours and fonts
+└── widgets.py              reusable buttons, cards, charts and tables
 ```
 
-## Data structures (written by hand, used by the app)
+## Python data structures used
 
-| Structure | File | Where it is used |
-|---|---|---|
-| Linked list | `ds/linked_list.py` | storage inside the queue (O(1) add at tail, remove at head) |
-| Queue (FIFO) | `ds/queue.py` | `worker.py`: database jobs run in the order the screens asked; results come back the same way |
-| Stack (LIFO) | `ds/stack.py` | `app.py`: screen history for the **← Back** button |
-| Binary search tree | `ds/bst.py` | `screens/sensors.py`: readings keyed by time; hovering a chart does a `floor()` search for the reading at that moment (built balanced with `from_sorted`) |
-
-Built-in structures also used: **set** (fertilizers applied recently, engine), **dict** (efficiency
-table, sensor lookups), **lists** (rules append recommendations), **hashing** (bcrypt passwords).
+| Structure | Where it is used |
+|---|---|
+| `queue.Queue` (thread-safe FIFO) | `worker.py`: database jobs run in the order the screens asked; results come back the same way |
+| list as a stack | `app.py`: screen history for the **← Back** button |
+| `bisect` (binary search) | `screens/sensors.py`: hovering a chart finds the reading at that moment |
+| dict / set / list | engine lookups, recently applied fertilizers, collected recommendations |
 
 ## Database features used
 
