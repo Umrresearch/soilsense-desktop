@@ -4,6 +4,13 @@ A desktop version of the SoilSense smart sugarcane advisory, written in Python w
 It connects **live to the same Neon PostgreSQL database as the website**, so anything you do
 here (mark advice as done, change thresholds) shows on the website too, and the other way round.
 
+## Team
+
+- Avani Maniyar
+- Yuvraj Marwaha
+- Mohammed Umar Momin
+- Aayush Nair
+
 ## Run it
 
 1. Install Python 3.10+ from python.org (tick **"Add python.exe to PATH"**).
